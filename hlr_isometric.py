@@ -32,19 +32,18 @@ def load_step_file(step_path):
 
 def compute_hlr_isometric(shape):
     """
-    Вычисляет HLR для изометрической проекции
+    Вычисляет HLR для изометрической проекции - вид сверху справа
     Возвращает видимые и скрытые рёбра
     """
-    # Изометрический угол (30°)
-    angle = math.radians(30)
-    cos_a = math.cos(angle)
-    sin_a = math.sin(angle)
+    # Изометрический вид "сверху справа"
+    # Смотрим сверху (Z+), справа (X+), немного спереди (Y-)
+    angle = math.radians(45)  # Угол между X и Y
     
-    # Направление взгляда для изометрии
-    view_dir = gp_Dir(sin_a, sin_a, cos_a)
+    # Направление взгляда: сверху-справа-спереди
+    view_dir = gp_Dir(1.0, -1.0, 1.0)  # Нормализуется автоматически
     
     # Точка наблюдения (далеко от объекта)
-    eye_point = gp_Pnt(1000, 1000, 1000)
+    eye_point = gp_Pnt(1000, -1000, 1000)
     
     # Создаём проектор
     projector = HLRAlgo_Projector(gp_Ax2(eye_point, view_dir))
@@ -92,6 +91,23 @@ def extract_edges(hlr, visible_only=True):
     return edges
 
 
+def project_3d_to_2d_iso(x, y, z):
+    """
+    Проецирует 3D точку на 2D плоскость изометрии (вид сверху-справа)
+    """
+    # Изометрическая проекция: сверху-справа
+    # Проекция на плоскость XY с учётом направления взгляда (1, -1, 1)
+    angle = math.radians(45)
+    cos_a = math.cos(angle)
+    sin_a = math.sin(angle)
+    
+    # Изометрическая проекция (стандартная формула)
+    px = (x - y) * cos_a
+    py = z + (x + y) * sin_a
+    
+    return px, py
+
+
 def edge_to_dxf_lines(edge, edge_type='visible'):
     """
     Конвертирует OCCT edge в список линий для DXF
@@ -112,14 +128,21 @@ def edge_to_dxf_lines(edge, edge_type='visible'):
         prev_point = None
         for i in range(num_points + 1):
             param = first + i * step
-            point = curve_adaptor.Value(param)
+            point_3d = curve_adaptor.Value(param)
+            
+            # Проецируем 3D точку на 2D плоскость изометрии
+            px, py = project_3d_to_2d_iso(
+                point_3d.X(),
+                point_3d.Y(),
+                point_3d.Z()
+            )
             
             if prev_point:
                 lines.append((
-                    prev_point.X(), prev_point.Y(),
-                    point.X(), point.Y()
+                    prev_point[0], prev_point[1],
+                    px, py
                 ))
-            prev_point = point
+            prev_point = (px, py)
     except Exception as e:
         # Если не удалось извлечь кривую, пропускаем edge
         pass
