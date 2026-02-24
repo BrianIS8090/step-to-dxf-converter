@@ -476,6 +476,7 @@ async def convert_to_pdf(file: UploadFile = File(...)):
 def dxf_to_pdf(dxf_path: str, pdf_path: str):
     """
     Конвертирует DXF файл в PDF через matplotlib
+    Инвертированные цвета: тёмный фон, светлые линии
     """
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
@@ -484,16 +485,29 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     fig = plt.figure(figsize=(24, 18), dpi=150)
     ax = fig.add_subplot()
     
+    # Устанавливаем тёмный фон
+    ax.set_facecolor('#1a1a1a')  # Тёмно-серый фон
+    fig.patch.set_facecolor('#1a1a1a')
+    
     # Рендерим DXF через ezdxf
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
+    # Инвертируем цвета линий (белые на тёмном фоне)
+    for line in ax.get_lines():
+        color = line.get_color()
+        # Если линия чёрная или тёмная - делаем белой
+        if color == 'black' or color == '#000000':
+            line.set_color('white')
+        elif color == '(0.0, 0.0, 0.0)':
+            line.set_color('white')
+    
     # Сохраняем в PDF
     plt.tight_layout()
     plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
-                facecolor='white', edgecolor='none')
+                facecolor='#1a1a1a', edgecolor='none')
     plt.close(fig)
 
 
