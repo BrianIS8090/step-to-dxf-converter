@@ -114,8 +114,8 @@ def load_step_and_generate_dxf(step_path: str, output_dxf: str):
     iso_size = max(w_pts, h_pts, d_pts) * 1.4  # Больше для изометрии (учитываем проекцию)
     iso_x, iso_y = front_x + w_pts + gap + margin, top_y
 
-    # Вид сбоку (YZ) - справа от изометрии
-    side_x, side_y = iso_x + iso_size + gap, front_y
+    # Вид сбоку (YZ) - ПОД изометрией
+    side_x, side_y = iso_x, front_y
     
     # Спецификация - справа от всех проекций
     spec_x = side_x + h_pts + gap + margin
