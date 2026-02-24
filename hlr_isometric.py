@@ -78,11 +78,11 @@ def extract_edges(hlr, visible_only=True):
     visible_only=False -> все (видимые + скрытые)
     """
     edges = []
-    
+
     # Конвертер HLR -> TopoDS_Shape
     hlr_to_shape = HLRBRep_HLRToShape(hlr)
-    
-    # Видимые контуры (VCompound)
+
+    # 1. Видимые рёбра (VCompound)
     visible_compound = hlr_to_shape.VCompound()
     if visible_compound:
         explorer = TopExp_Explorer(visible_compound, TopAbs_EDGE)
@@ -90,7 +90,26 @@ def extract_edges(hlr, visible_only=True):
             edge = topods.Edge(explorer.Current())
             edges.append(('visible', edge))
             explorer.Next()
-    
+
+    # 2. Силуэтные линии видимых поверхностей (Rg1LineVCompound)
+    # Это контуры цилиндров, сфер и других плавных поверхностей!
+    rg1_compound = hlr_to_shape.Rg1LineVCompound()
+    if rg1_compound:
+        explorer = TopExp_Explorer(rg1_compound, TopAbs_EDGE)
+        while explorer.More():
+            edge = topods.Edge(explorer.Current())
+            edges.append(('silhouette', edge))
+            explorer.Next()
+
+    # 3. Контурные линии (OutLineVCompound)
+    outline_compound = hlr_to_shape.OutLineVCompound()
+    if outline_compound:
+        explorer = TopExp_Explorer(outline_compound, TopAbs_EDGE)
+        while explorer.More():
+            edge = topods.Edge(explorer.Current())
+            edges.append(('outline', edge))
+            explorer.Next()
+
     # Скрытые контуры (если нужно)
     if not visible_only:
         hidden_compound = hlr_to_shape.HCompound()
@@ -100,7 +119,7 @@ def extract_edges(hlr, visible_only=True):
                 edge = topods.Edge(explorer.Current())
                 edges.append(('hidden', edge))
                 explorer.Next()
-    
+
     return edges
 
 
