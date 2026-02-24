@@ -192,21 +192,39 @@ def hlr_to_dxf(step_path, output_dxf, offset_x=100, offset_y=100, scale=1.0):
     doc = ezdxf.new()
     msp = doc.modelspace()
     
-    # Конвертируем edges в линии
-    total_lines = 0
+    # Первый проход: вычисляем bounding box
+    all_lines = []
+    min_x = min_y = float('inf')
+    max_x = max_y = float('-inf')
+    
     for edge_type, edge in edges:
         lines = edge_to_dxf_lines(edge, edge_type)
-        
         for x1, y1, x2, y2 in lines:
-            # Масштаб и смещение
-            msp.add_line(
-                (x1 * scale + offset_x, y1 * scale + offset_y),
-                (x2 * scale + offset_x, y2 * scale + offset_y)
-            )
-            total_lines += 1
+            all_lines.append((x1, y1, x2, y2))
+            min_x = min(min_x, x1, x2)
+            max_x = max(max_x, x1, x2)
+            min_y = min(min_y, y1, y2)
+            max_y = max(max_y, y1, y2)
+    
+    # Нормализуем координаты: сдвигаем к (0, 0)
+    total_lines = 0
+    for x1, y1, x2, y2 in all_lines:
+        # Сдвигаем к началу координат
+        nx1 = x1 - min_x
+        ny1 = y1 - min_y
+        nx2 = x2 - min_x
+        ny2 = y2 - min_y
+        
+        # Масштаб и смещение
+        msp.add_line(
+            (nx1 * scale + offset_x, ny1 * scale + offset_y),
+            (nx2 * scale + offset_x, ny2 * scale + offset_y)
+        )
+        total_lines += 1
     
     doc.saveas(output_dxf)
     print(f"DXF saved: {output_dxf} ({total_lines} lines)")
+    print(f"Bounding box: {max_x - min_x:.1f} x {max_y - min_y:.1f}")
     
     return total_lines
 

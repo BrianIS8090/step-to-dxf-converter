@@ -108,13 +108,14 @@ def load_step_and_generate_dxf(step_path: str, output_dxf: str):
     
     # Вид сверху (XY) - над видом спереди
     top_x, top_y = front_x, front_y + d_pts + gap + margin
-    
+
     # Изометрический вид - справа от вида сверху
-    iso_size = max(w_pts, h_pts, d_pts) * 1.2  # Немного больше для изометрии
+    # Размер изометрии примерно = диагональ bounding box * scale
+    iso_size = max(w_pts, h_pts, d_pts) * 1.4  # Больше для изометрии (учитываем проекцию)
     iso_x, iso_y = front_x + w_pts + gap + margin, top_y
-    
-    # Вид сбоку (YZ) - под изометрией
-    side_x, side_y = iso_x, front_y
+
+    # Вид сбоку (YZ) - справа от изометрии
+    side_x, side_y = iso_x + iso_size + gap, front_y
     
     # Спецификация - справа от всех проекций
     spec_x = side_x + h_pts + gap + margin
