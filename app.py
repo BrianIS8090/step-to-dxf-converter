@@ -242,13 +242,9 @@ def add_dimension_line(msp, x1, y1, x2, y2, text, offset=10, text_offset=5):
 def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     """
     Проецирует КОНТУРЫ видимых элементов в изометрии
-    Показывает только silhouette edges (внешние границы видимых частей)
+    Использует convex hull для быстрого определения внешних контуров
     """
     import math
-    
-    faces = mesh.faces
-    vertices = mesh.vertices
-    face_normals = mesh.face_normals
     
     # Изометрический угол (30°)
     angle = math.radians(30)
@@ -258,6 +254,18 @@ def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     # Направление взгляда для изометрии
     view_dir = np.array([sin_a, sin_a, cos_a])
     view_dir = view_dir / np.linalg.norm(view_dir)
+    
+    # Используем convex hull для получения внешней оболочки
+    try:
+        hull = mesh.convex_hull
+        faces = hull.faces
+        vertices = hull.vertices
+        face_normals = hull.face_normals
+    except:
+        # Если convex hull не работает, используем оригинальный mesh
+        faces = mesh.faces
+        vertices = mesh.vertices
+        face_normals = mesh.face_normals
     
     # Определяем ВИДИМЫЕ грани
     visible = np.dot(face_normals, view_dir) > 0
@@ -273,16 +281,13 @@ def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     silhouette_edges = []
     for edge, face_indices in edges_dict.items():
         if len(face_indices) == 1:
-            # Boundary edge - ребро только одной грани
             if visible[face_indices[0]]:
                 silhouette_edges.append(edge)
         elif len(face_indices) == 2:
-            # Ребро между двумя гранями - показываем только если одна видна, другая нет
             v1 = visible[face_indices[0]]
             v2 = visible[face_indices[1]]
-            if v1 != v2:  # Граница между видимой и невидимой частью
+            if v1 != v2:
                 silhouette_edges.append(edge)
-        # Если ребро общее для 2 видимых граней - НЕ рисуем (это внутренний контур)
     
     # Проекция вершин в изометрию
     def project_vertex_iso(v):
@@ -294,15 +299,12 @@ def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     for e in silhouette_edges:
         v1, v2 = vertices[e[0]], vertices[e[1]]
         
-        # Сдвигаем к началу координат
         v1_shifted = v1 - bounds[0]
         v2_shifted = v2 - bounds[0]
         
-        # Проецируем в изометрию
         p1 = project_vertex_iso(v1_shifted)
         p2 = project_vertex_iso(v2_shifted)
         
-        # Масштаб и смещение
         x1 = p1[0] * scale * 1000 + offset_x
         y1 = p1[1] * scale * 1000 + offset_y
         x2 = p2[0] * scale * 1000 + offset_x
