@@ -120,17 +120,23 @@ def load_step_and_generate_dxf(step_path: str, output_dxf: str):
     
     total_lines = 0
     
-    # Обрабатываем каждую деталь
+    # Объединяем все детали в один mesh для изометрии (чтобы не просвечивали внутренние детали)
+    all_meshes = list(scene.geometry.values())
+    combined_mesh = trimesh.util.concatenate(all_meshes) if len(all_meshes) > 1 else all_meshes[0]
+    
+    # Обрабатываем каждую деталь для ортогональных видов
     for name, mesh in scene.geometry.items():
         # Вид сверху (XY)
         n1 = project_silhouette(msp, mesh, (0, 0, 1), top_x, top_y, scale, (min_x, min_y))
         # Вид спереди (XZ)
         n2 = project_silhouette(msp, mesh, (0, 1, 0), front_x, front_y, scale, (min_x, min_z))
-        # Изометрический вид
-        n3 = project_isometric(msp, mesh, iso_x, iso_y, scale, global_bounds)
         # Вид сбоку (YZ)
         n4 = project_silhouette(msp, mesh, (1, 0, 0), side_x, side_y, scale, (min_y, min_z))
-        total_lines += n1 + n2 + n3 + n4
+        total_lines += n1 + n2 + n4
+    
+    # Изометрический вид - рисуем ВЕСЬ assembly как единое целое
+    n3 = project_isometric(msp, combined_mesh, iso_x, iso_y, scale, global_bounds)
+    total_lines += n3
     
     # Подписи
     msp.add_text("Вид спереди", dxfattribs={"height": 4}).set_placement((front_x, front_y - 15))
