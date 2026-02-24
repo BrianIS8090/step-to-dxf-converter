@@ -241,8 +241,8 @@ def add_dimension_line(msp, x1, y1, x2, y2, text, offset=10, text_offset=5):
 
 def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     """
-    Проецирует КОНТУРЫ видимых элементов в изометрии
-    Фильтрует рёбра по глубине - показывает только передние контуры
+    Проецирует силуэт в изометрии (30° угол)
+    Показывает контуры каждой детали (может просвечиваться)
     """
     import math
     
@@ -259,59 +259,47 @@ def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
     view_dir = np.array([sin_a, sin_a, cos_a])
     view_dir = view_dir / np.linalg.norm(view_dir)
     
-    # Определяем ВИДИМЫЕ грани
+    # Определяем видимые грани
     visible = np.dot(face_normals, view_dir) > 0
     
-    # Вычисляем диапазон глубины для фильтрации
-    depths = np.dot(vertices, view_dir)
-    max_depth = depths.max()
-    min_depth = depths.min()
-    depth_range = max_depth - min_depth
-    depth_threshold = max_depth - depth_range * 0.1  # Рисуем только передние 10% по глубине
-    
-    # Собираем edges и считаем сколько граней их используют
+    # Собираем edges
     edges_dict = defaultdict(list)
     for face_idx, face in enumerate(faces):
         for i in range(3):
             e = tuple(sorted([face[i], face[(i+1) % 3]]))
             edges_dict[e].append(face_idx)
     
-    # Находим SILHOUETTE EDGES (контуры видимых частей)
+    # Находим silhouette edges для изометрии
     silhouette_edges = []
     for edge, face_indices in edges_dict.items():
-        if len(face_indices) == 1:
-            if visible[face_indices[0]]:
-                # Проверяем глубину ребра
-                v1, v2 = vertices[edge[0]], vertices[edge[1]]
-                edge_depth = (np.dot(v1, view_dir) + np.dot(v2, view_dir)) / 2
-                if edge_depth >= depth_threshold:
-                    silhouette_edges.append(edge)
-        elif len(face_indices) == 2:
-            v1 = visible[face_indices[0]]
-            v2 = visible[face_indices[1]]
-            if v1 != v2:
-                # Проверяем глубину ребра
-                vt1, vt2 = vertices[edge[0]], vertices[edge[1]]
-                edge_depth = (np.dot(vt1, view_dir) + np.dot(vt2, view_dir)) / 2
-                if edge_depth >= depth_threshold:
-                    silhouette_edges.append(edge)
+        if len(face_indices) == 2:
+            # Ребро между двумя гранями
+            if visible[face_indices[0]] != visible[face_indices[1]]:
+                silhouette_edges.append(edge)
+        elif len(face_indices) == 1 and visible[face_indices[0]]:
+            # Boundary edge
+            silhouette_edges.append(edge)
     
     # Проекция вершин в изометрию
     def project_vertex_iso(v):
+        # Изометрическая проекция
         x = (v[0] - v[1]) * cos_a
         y = v[2] * cos_a + (v[0] + v[1]) * sin_a
         return x, y
     
-    # Рисуем только передние контуры
+    # Рисуем силуэт
     for e in silhouette_edges:
         v1, v2 = vertices[e[0]], vertices[e[1]]
         
+        # Сдвигаем к началу координат
         v1_shifted = v1 - bounds[0]
         v2_shifted = v2 - bounds[0]
         
+        # Проецируем в изометрию
         p1 = project_vertex_iso(v1_shifted)
         p2 = project_vertex_iso(v2_shifted)
         
+        # Масштаб и смещение
         x1 = p1[0] * scale * 1000 + offset_x
         y1 = p1[1] * scale * 1000 + offset_y
         x2 = p2[0] * scale * 1000 + offset_x
