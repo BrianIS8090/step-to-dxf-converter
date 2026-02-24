@@ -14,6 +14,8 @@ import numpy as np
 from datetime import datetime
 from collections import defaultdict, Counter
 import re
+import subprocess
+import tempfile
 
 app = FastAPI(title="STEP to DXF Converter")
 
@@ -134,8 +136,8 @@ def load_step_and_generate_dxf(step_path: str, output_dxf: str):
         n4 = project_silhouette(msp, mesh, (1, 0, 0), side_x, side_y, scale, (min_y, min_z))
         total_lines += n1 + n2 + n4
     
-    # Изометрический вид - рисуем ВЕСЬ assembly как единое целое
-    n3 = project_isometric(msp, combined_mesh, iso_x, iso_y, scale, global_bounds)
+    # Изометрический вид - используем HLR через OCCT (без просвечивания!)
+    n3 = project_isometric_hlr(step_path, msp, iso_x, iso_y, scale)
     total_lines += n3
     
     # Подписи
@@ -237,6 +239,57 @@ def add_dimension_line(msp, x1, y1, x2, y2, text, offset=10, text_offset=5):
         # Текст
         mid_x = (x1 + x2) / 2
         msp.add_text(text, dxfattribs={"height": 3}).set_placement((mid_x, y1 - offset - text_offset))
+
+
+def project_isometric_hlr(step_path, msp, offset_x, offset_y, scale):
+    """
+    Генерирует изометрию с HLR через OCCT
+    Вызывает внешний скрипт hlr_isometric.py
+    """
+    try:
+        # Временный файл для HLR результата
+        with tempfile.NamedTemporaryFile(suffix='.dxf', delete=False) as tmp:
+            tmp_dxf = tmp.name
+        
+        # Вызываем HLR скрипт
+        hlr_script = Path(__file__).parent / "hlr_isometric.py"
+        result = subprocess.run(
+            [str(hlr_script), step_path, tmp_dxf],
+            capture_output=True,
+            text=True,
+            timeout=180
+        )
+        
+        if result.returncode != 0:
+            print(f"HLR failed: {result.stderr}")
+            return 0
+        
+        # Читаем результат DXF
+        hlr_doc = ezdxf.readfile(tmp_dxf)
+        hlr_msp = hlr_doc.modelspace()
+        
+        # Копируем линии в основной DXF со смещением
+        lines_count = 0
+        for entity in hlr_msp:
+            if entity.dxftype() == 'LINE':
+                start = entity.dxf.start
+                end = entity.dxf.end
+                
+                # Применяем масштаб и смещение
+                msp.add_line(
+                    (start[0] * scale + offset_x, start[1] * scale + offset_y),
+                    (end[0] * scale + offset_x, end[1] * scale + offset_y)
+                )
+                lines_count += 1
+        
+        # Удаляем временный файл
+        Path(tmp_dxf).unlink(missing_ok=True)
+        
+        return lines_count
+        
+    except Exception as e:
+        print(f"HLR error: {e}")
+        return 0
 
 
 def project_isometric(msp, mesh, offset_x, offset_y, scale, bounds):
