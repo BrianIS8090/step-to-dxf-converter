@@ -16,6 +16,11 @@ from collections import defaultdict, Counter
 import re
 import subprocess
 import tempfile
+import matplotlib
+matplotlib.use('Agg')  # Backend without GUI
+import matplotlib.pyplot as plt
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 
 app = FastAPI(title="STEP to DXF Converter")
 
@@ -433,6 +438,63 @@ def project_silhouette(msp, mesh, view_dir, global_offset_x, global_offset_y, sc
         count += 1
     
     return count
+
+
+@app.post("/convert-pdf")
+async def convert_to_pdf(file: UploadFile = File(...)):
+    """
+    Конвертирует STEP файл в PDF с чертежом
+    """
+    try:
+        # Сохраняем загруженный файл
+        step_path = TEMP_DIR / f"{file.filename}"
+        with open(step_path, "wb") as f:
+            f.write(await file.read())
+        
+        # Генерируем DXF
+        dxf_path = TEMP_DIR / f"{file.filename}.dxf"
+        result = load_step_and_generate_dxf(str(step_path), str(dxf_path))
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate DXF")
+        
+        # Конвертируем DXF в PDF
+        pdf_path = TEMP_DIR / f"{file.filename}.pdf"
+        dxf_to_pdf(str(dxf_path), str(pdf_path))
+        
+        # Возвращаем PDF
+        return FileResponse(
+            path=pdf_path,
+            media_type="application/pdf",
+            filename=f"{file.filename}.pdf"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def dxf_to_pdf(dxf_path: str, pdf_path: str):
+    """
+    Конвертирует DXF файл в PDF через matplotlib
+    """
+    doc = ezdxf.readfile(dxf_path)
+    msp = doc.modelspace()
+    
+    # Создаём figure с большим размером для качества
+    fig = plt.figure(figsize=(24, 18), dpi=150)
+    ax = fig.add_subplot()
+    
+    # Рендерим DXF через ezdxf
+    ctx = RenderContext(doc)
+    out = MatplotlibBackend(ax)
+    frontend = Frontend(ctx, out)
+    frontend.draw_layout(msp, finalize=True)
+    
+    # Сохраняем в PDF
+    plt.tight_layout()
+    plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    plt.close(fig)
 
 
 @app.get("/", response_class=HTMLResponse)

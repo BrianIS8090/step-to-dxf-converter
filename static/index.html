@@ -400,6 +400,9 @@
             <button class="btn btn-primary" id="convertBtn" disabled>
                 Скачать DXF
             </button>
+            <button class="btn btn-primary" id="convertPdfBtn" disabled style="margin-left: 10px;">
+                Скачать PDF
+            </button>
         </div>
         
         <div class="progress" id="progress">
@@ -437,6 +440,7 @@
         const dimHeight = document.getElementById('dimHeight');
         const dimDepth = document.getElementById('dimDepth');
         const convertBtn = document.getElementById('convertBtn');
+        const convertPdfBtn = document.getElementById('convertPdfBtn');
         const progress = document.getElementById('progress');
         const progressBar = document.getElementById('progressBar');
         const status = document.getElementById('status');
@@ -486,6 +490,7 @@
             fileSize.textContent = formatFileSize(file.size);
             fileInfo.classList.add('show');
             convertBtn.disabled = false;
+            convertPdfBtn.disabled = false;
             status.classList.remove('show');
             
             // Получаем размеры
@@ -576,6 +581,69 @@
                 clearInterval(progressInterval);
                 spinner.classList.remove('show');
                 convertBtn.disabled = false;
+            }
+        });
+        
+        convertPdfBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            convertPdfBtn.disabled = true;
+            status.classList.remove('show');
+            
+            // Показываем спиннер
+            spinner.classList.add('show');
+            spinnerText.textContent = 'Конвертация STEP в PDF...';
+            
+            // Анимация текста деталей
+            const details = [
+                'Загрузка файла...',
+                'Анализ геометрии...',
+                'Вычисление силуэтов...',
+                'Генерация проекций...',
+                'Создание PDF файла...'
+            ];
+            let detailIndex = 0;
+            progressInterval = setInterval(() => {
+                spinnerDetail.textContent = details[detailIndex % details.length];
+                detailIndex++;
+            }, 2000);
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                const response = await fetch('./convert-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Ошибка конвертации');
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedFile.name.replace(/\.(step|stp)$/i, '_drawing.pdf');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                // Скрываем спиннер перед показом сообщения
+                clearInterval(progressInterval);
+                spinner.classList.remove('show');
+                
+                showStatus('success', 'PDF файл успешно создан и загружен!');
+                
+            } catch (error) {
+                showStatus('error', error.message);
+            } finally {
+                clearInterval(progressInterval);
+                spinner.classList.remove('show');
+                convertPdfBtn.disabled = false;
             }
         });
         
