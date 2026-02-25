@@ -557,7 +557,13 @@
             }, 2000);
             
             // Даём браузеру время отрендерить спиннер
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setTimeout(resolve, 200);
+                    });
+                });
+            });
             
             const formData = new FormData();
             formData.append('file', selectedFile);
@@ -623,7 +629,13 @@
             }, 2000);
             
             // Даём браузеру время отрендерить спиннер
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setTimeout(resolve, 200);
+                    });
+                });
+            });
             
             const formData = new FormData();
             formData.append('file', selectedFile);
