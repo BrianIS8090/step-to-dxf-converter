@@ -21,6 +21,9 @@ matplotlib.use('Agg')  # Backend without GUI
 import matplotlib.pyplot as plt
 from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+import fitz  # PyMuPDF
+from PIL import Image
+import io
 
 app = FastAPI(title="STEP to DXF Converter")
 
@@ -476,8 +479,10 @@ async def convert_to_pdf(file: UploadFile = File(...)):
 def dxf_to_pdf(dxf_path: str, pdf_path: str):
     """
     Конвертирует DXF файл в PDF через matplotlib
-    Белый фон с чёрными линиями и текстом
+    Белый фон с чёрными линиями и текстом (инверсия через PyMuPDF)
     """
+    import fitz  # PyMuPDF
+    
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
     
@@ -486,52 +491,63 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     ax = fig.add_subplot()
     ax.set_facecolor('white')
     
-    # Рендерим DXF через ezdxf
+    # Рендерим DXF через ezdxf (с оригинальными цветами)
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
-    # Принудительно все элементы делаем чёрными
-    for line in ax.get_lines():
-        line.set_color('black')
-        line.set_linewidth(0.5)
-    
-    for text in ax.texts:
-        text.set_color('black')
-    
-    for patch in ax.patches:
-        patch.set_edgecolor('black')
-        patch.set_facecolor('none')
-    
-    for collection in ax.collections:
-        collection.set_edgecolor('black')
-        collection.set_facecolor('none')
-    
-    # Рендерим текст вручную
-    for entity in msp:
-        if entity.dxftype() == 'TEXT':
-            insert = entity.dxf.insert
-            text_content = entity.dxf.text
-            height = entity.dxf.height if hasattr(entity.dxf, 'height') else 2.5
-            rotation = entity.dxf.rotation if hasattr(entity.dxf, 'rotation') else 0
-            ax.text(insert[0], insert[1], text_content,
-                   fontsize=height * 1.5, color='black',
-                   rotation=rotation, ha='left', va='bottom')
-        elif entity.dxftype() == 'MTEXT':
-            insert = entity.dxf.insert
-            text_content = entity.text
-            height = entity.dxf.char_height if hasattr(entity.dxf, 'char_height') else 2.5
-            ax.text(insert[0], insert[1], text_content,
-                   fontsize=height * 1.5, color='black',
-                   ha='left', va='bottom')
-    
     ax.set_axis_off()
     
+    # Сохраняем временный PDF
+    temp_pdf = pdf_path + '.temp.pdf'
     plt.tight_layout()
-    plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
+    plt.savefig(temp_pdf, format='pdf', bbox_inches='tight',
                 facecolor='white', edgecolor='none', pad_inches=0.1)
     plt.close(fig)
+    
+    # Инвертируем цвета через PyMuPDF
+    pdf_doc = fitz.open(temp_pdf)
+    
+    for page in pdf_doc:
+        # Получаем все рисунки на странице
+        for xref in page.get_images(full=True):
+            # Инвертируем каждое изображение
+            base_image = pdf_doc.extract_image(xref[0])
+            image_bytes = base_image["image"]
+            
+            # Открываем изображение через PIL
+            from PIL import Image
+            import io
+            
+            img = Image.open(io.BytesIO(image_bytes))
+            
+            # Если изображение в режиме RGB или RGBA
+            if img.mode in ('RGB', 'RGBA'):
+                # Инвертируем цвета
+                inverted = Image.eval(img, lambda x: 255 - x)
+                
+                # Сохраняем обратно
+                output = io.BytesIO()
+                inverted.save(output, format='PNG')
+                output.seek(0)
+                
+                # Заменяем изображение в PDF
+                pdf_doc._updateObject(xref[0], {
+                    **base_image,
+                    "image": output.read()
+                })
+    
+    # Альтернативный метод - инверсия через страницу
+    for page in pdf_doc:
+        # Инвертируем все цвета на странице
+        page.invert_colors()
+    
+    pdf_doc.save(pdf_path)
+    pdf_doc.close()
+    
+    # Удаляем временный файл
+    Path(temp_pdf).unlink(missing_ok=True)
 
 
 @app.get("/", response_class=HTMLResponse)
