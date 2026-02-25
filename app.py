@@ -500,6 +500,9 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
         if isinstance(color, str):
             line.set_color('black')
     
+    # Проверяем есть ли текст после ezdxf рендеринга
+    texts_before = len(ax.texts)
+    
     for text in ax.texts:
         text.set_color('black')
     
@@ -513,6 +516,25 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     for collection in ax.collections:
         collection.set_edgecolor('black')
         collection.set_facecolor('none')
+    
+    # Если ezdxf не отрендерил текст - рендерим вручную
+    if texts_before == 0:
+        for entity in msp:
+            if entity.dxftype() == 'TEXT':
+                insert = entity.dxf.insert
+                text_content = entity.dxf.text
+                height = getattr(entity.dxf, 'height', 2.5)
+                rotation = getattr(entity.dxf, 'rotation', 0)
+                ax.text(insert[0], insert[1], text_content,
+                       fontsize=height * 1.5, color='black',
+                       rotation=rotation, ha='left', va='bottom')
+            elif entity.dxftype() == 'MTEXT':
+                insert = entity.dxf.insert
+                text_content = entity.text
+                height = getattr(entity.dxf, 'char_height', 2.5)
+                ax.text(insert[0], insert[1], text_content,
+                       fontsize=height * 1.5, color='black',
+                       ha='left', va='bottom')
     
     plt.tight_layout()
     plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
