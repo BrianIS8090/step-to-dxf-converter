@@ -476,25 +476,34 @@ async def convert_to_pdf(file: UploadFile = File(...)):
 def dxf_to_pdf(dxf_path: str, pdf_path: str):
     """
     Конвертирует DXF файл в PDF через matplotlib
-    Светлый фон с тёмными линиями
+    Белый фон с чёрными линиями
     """
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
     
-    # Создаём figure с большим размером для качества
-    fig = plt.figure(figsize=(24, 18), dpi=150)
+    # Создаём figure с белым фоном
+    fig = plt.figure(figsize=(24, 18), dpi=150, facecolor='white')
     ax = fig.add_subplot()
+    ax.set_facecolor('white')  # Белый фон осей
     
-    # Рендерим DXF через ezdxf
+    # Рендерим DXF через ezdxf с явными настройками цветов
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
-    # Сохраняем в PDF (белый фон, чёрные линии - стандартный режим)
+    # Принудительно устанавливаем чёрный цвет для всех линий
+    for line in ax.get_lines():
+        line.set_color('black')
+        line.set_linewidth(0.5)
+    
+    # Убираем оси
+    ax.set_axis_off()
+    
+    # Сохраняем в PDF
     plt.tight_layout()
     plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
-                facecolor='white', edgecolor='none')
+                facecolor='white', edgecolor='none', pad_inches=0.1)
     plt.close(fig)
 
 
