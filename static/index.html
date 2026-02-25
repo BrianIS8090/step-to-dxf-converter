@@ -545,6 +545,9 @@
                 detailIndex++;
             }, 2000);
             
+            // Даём браузеру время отрендерить спиннер
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             const formData = new FormData();
             formData.append('file', selectedFile);
             
@@ -607,6 +610,9 @@
                 spinnerDetail.textContent = details[detailIndex % details.length];
                 detailIndex++;
             }, 2000);
+            
+            // Даём браузеру время отрендерить спиннер
+            await new Promise(resolve => setTimeout(resolve, 100));
             
             const formData = new FormData();
             formData.append('file', selectedFile);
