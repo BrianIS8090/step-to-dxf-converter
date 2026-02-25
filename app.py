@@ -476,7 +476,7 @@ async def convert_to_pdf(file: UploadFile = File(...)):
 def dxf_to_pdf(dxf_path: str, pdf_path: str):
     """
     Конвертирует DXF файл в PDF через matplotlib
-    Белый фон с чёрными линиями
+    Белый фон с чёрными линиями и текстом
     """
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
@@ -486,16 +486,30 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     ax = fig.add_subplot()
     ax.set_facecolor('white')  # Белый фон осей
     
-    # Рендерим DXF через ezdxf с явными настройками цветов
+    # Рендерим DXF через ezdxf
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
-    # Принудительно устанавливаем чёрный цвет для всех линий
+    # Принудительно устанавливаем чёрный цвет для ВСЕХ элементов
     for line in ax.get_lines():
         line.set_color('black')
         line.set_linewidth(0.5)
+    
+    # Меняем цвет текста
+    for text in ax.texts:
+        text.set_color('black')
+    
+    # Меняем цвет патчей (полигонов)
+    for patch in ax.patches:
+        patch.set_edgecolor('black')
+        patch.set_facecolor('none')
+    
+    # Меняем цвет коллекций
+    for collection in ax.collections:
+        collection.set_edgecolor('black')
+        collection.set_facecolor('none')
     
     # Убираем оси
     ax.set_axis_off()
