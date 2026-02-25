@@ -185,9 +185,20 @@
         }
         
         .buttons {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
-            flex-wrap: wrap;
+        }
+        
+        @media (max-width: 600px) {
+            .buttons {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .btn {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
         }
         
         .progress {
@@ -400,7 +411,7 @@
             <button class="btn btn-primary" id="convertBtn" disabled>
                 Скачать DXF
             </button>
-            <button class="btn btn-primary" id="convertPdfBtn" disabled style="margin-left: 10px;">
+            <button class="btn btn-primary" id="convertPdfBtn" disabled>
                 Скачать PDF
             </button>
         </div>
