@@ -484,7 +484,7 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     # Создаём figure с белым фоном
     fig = plt.figure(figsize=(24, 18), dpi=150, facecolor='white')
     ax = fig.add_subplot()
-    ax.set_facecolor('white')  # Белый фон осей
+    ax.set_facecolor('white')
     
     # Рендерим DXF через ezdxf
     ctx = RenderContext(doc)
@@ -492,26 +492,46 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
-    # Принудительно устанавливаем чёрный цвет для ВСЕХ элементов
+    # Принудительно устанавливаем чёрный цвет для всех matplotlib элементов
     for line in ax.get_lines():
         line.set_color('black')
         line.set_linewidth(0.5)
     
-    # Меняем цвет текста
     for text in ax.texts:
         text.set_color('black')
     
-    # Меняем цвет патчей (полигонов)
     for patch in ax.patches:
         patch.set_edgecolor('black')
         patch.set_facecolor('none')
     
-    # Меняем цвет коллекций
     for collection in ax.collections:
         collection.set_edgecolor('black')
         collection.set_facecolor('none')
     
-    # Убираем оси
+    # Теперь рендерим DXF текст вручную (ezdxf backend иногда пропускает)
+    for entity in msp:
+        if entity.dxftype() == 'TEXT':
+            # Получаем свойства текста
+            insert = entity.dxf.insert
+            text_content = entity.dxf.text
+            height = entity.dxf.height if hasattr(entity.dxf, 'height') else 2.5
+            rotation = entity.dxf.rotation if hasattr(entity.dxf, 'rotation') else 0
+            
+            # Рисуем текст matplotlib'ом
+            ax.text(insert[0], insert[1], text_content,
+                   fontsize=height * 1.5, color='black',
+                   rotation=rotation, ha='left', va='bottom')
+        
+        elif entity.dxftype() == 'MTEXT':
+            # Многострочный текст
+            insert = entity.dxf.insert
+            text_content = entity.text
+            height = entity.dxf.char_height if hasattr(entity.dxf, 'char_height') else 2.5
+            
+            ax.text(insert[0], insert[1], text_content,
+                   fontsize=height * 1.5, color='black',
+                   ha='left', va='bottom')
+    
     ax.set_axis_off()
     
     # Сохраняем в PDF
