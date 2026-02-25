@@ -476,17 +476,21 @@ async def convert_to_pdf(file: UploadFile = File(...)):
 def dxf_to_pdf(dxf_path: str, pdf_path: str):
     """
     Конвертирует DXF файл в PDF через matplotlib
-    Белый фон с чёрными линиями и текстом
+    Сначала генерирует чёрный фон/белые линии, потом инвертирует
     """
+    import fitz  # PyMuPDF
+    from PIL import Image
+    import io
+    
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
     
-    # Создаём figure с белым фоном
-    fig = plt.figure(figsize=(24, 18), dpi=150, facecolor='white')
+    # Создаём figure с ЧЁРНЫМ фоном (как в DXF)
+    fig = plt.figure(figsize=(24, 18), dpi=150, facecolor='black')
     ax = fig.add_subplot()
-    ax.set_facecolor('white')
+    ax.set_facecolor('black')
     
-    # Рендерим DXF через ezdxf
+    # Рендерим DXF через ezdxf (белые линии на чёрном)
     ctx = RenderContext(doc)
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
@@ -494,52 +498,40 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     
     ax.set_axis_off()
     
-    # Инвертируем цвета всех элементов matplotlib
-    for line in ax.get_lines():
-        color = line.get_color()
-        if isinstance(color, str):
-            line.set_color('black')
-    
-    # Проверяем есть ли текст после ezdxf рендеринга
-    texts_before = len(ax.texts)
-    
-    for text in ax.texts:
-        text.set_color('black')
-    
-    for patch in ax.patches:
-        ec = patch.get_edgecolor()
-        # Если цвет светлый (близкий к белому) - делаем чёрным
-        if sum(ec[:3]) > 2.0:  # RGB сумма > 2 = светлый
-            patch.set_edgecolor('black')
-        patch.set_facecolor('none')
-    
-    for collection in ax.collections:
-        collection.set_edgecolor('black')
-        collection.set_facecolor('none')
-    
-    # Если ezdxf не отрендерил текст - рендерим вручную
-    if texts_before == 0:
-        for entity in msp:
-            if entity.dxftype() == 'TEXT':
-                insert = entity.dxf.insert
-                text_content = entity.dxf.text
-                height = getattr(entity.dxf, 'height', 2.5)
-                rotation = getattr(entity.dxf, 'rotation', 0)
-                ax.text(insert[0], insert[1], text_content,
-                       fontsize=height * 1.5, color='black',
-                       rotation=rotation, ha='left', va='bottom')
-            elif entity.dxftype() == 'MTEXT':
-                insert = entity.dxf.insert
-                text_content = entity.text
-                height = getattr(entity.dxf, 'char_height', 2.5)
-                ax.text(insert[0], insert[1], text_content,
-                       fontsize=height * 1.5, color='black',
-                       ha='left', va='bottom')
-    
+    # Сохраняем временный PDF (чёрный фон)
+    temp_pdf = pdf_path + '.temp.pdf'
     plt.tight_layout()
-    plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
-                facecolor='white', edgecolor='none', pad_inches=0.1)
+    plt.savefig(temp_pdf, format='pdf', bbox_inches='tight',
+                facecolor='black', edgecolor='none', pad_inches=0.1)
     plt.close(fig)
+    
+    # Инвертируем PDF через PyMuPDF -> изображение -> PIL -> PDF
+    pdf_doc = fitz.open(temp_pdf)
+    page = pdf_doc[0]
+    
+    # Рендерим страницу в изображение (высокое качество)
+    mat = fitz.Matrix(3, 3)  # 3x масштаб для качества
+    pix = page.get_pixmap(matrix=mat)
+    img_bytes = pix.tobytes("png")
+    
+    # Инвертируем через PIL
+    img = Image.open(io.BytesIO(img_bytes))
+    if img.mode == 'RGB':
+        inverted = Image.eval(img, lambda x: 255 - x)
+    elif img.mode == 'RGBA':
+        r, g, b, a = img.split()
+        r = Image.eval(r, lambda x: 255 - x)
+        g = Image.eval(g, lambda x: 255 - x)
+        b = Image.eval(b, lambda x: 255 - x)
+        inverted = Image.merge('RGB', (r, g, b))
+    else:
+        inverted = img
+    
+    # Сохраняем инвертированное изображение в PDF
+    inverted.save(pdf_path, "PDF", resolution=450.0)
+    
+    pdf_doc.close()
+    Path(temp_pdf).unlink(missing_ok=True)
 
 
 @app.get("/", response_class=HTMLResponse)
