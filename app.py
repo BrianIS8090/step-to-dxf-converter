@@ -506,7 +506,7 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     for patch in ax.patches:
         ec = patch.get_edgecolor()
         # Если цвет светлый (близкий к белому) - делаем чёрным
-        if ec[:3].sum() > 2.0:  # RGB сумма > 2 = светлый
+        if sum(ec[:3]) > 2.0:  # RGB сумма > 2 = светлый
             patch.set_edgecolor('black')
         patch.set_facecolor('none')
     
