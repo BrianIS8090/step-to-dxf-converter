@@ -486,15 +486,8 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     ax = fig.add_subplot()
     ax.set_facecolor('white')
     
-    # Настраиваем RenderContext для чёрно-белого вывода
+    # Рендерим DXF через ezdxf
     ctx = RenderContext(doc)
-    
-    # Устанавливаем цветовую схему - все линии чёрные на белом фоне
-    ctx.current_layout.set_colors(
-        background='#FFFFFF',  # белый фон
-        foreground='#000000',  # чёрные линии
-    )
-    
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
@@ -515,7 +508,7 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
         collection.set_edgecolor('black')
         collection.set_facecolor('none')
     
-    # Рендерим текст вручную (на случай если backend пропустил)
+    # Рендерим текст вручную
     for entity in msp:
         if entity.dxftype() == 'TEXT':
             insert = entity.dxf.insert
