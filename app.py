@@ -486,13 +486,20 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
     ax = fig.add_subplot()
     ax.set_facecolor('white')
     
-    # Рендерим DXF через ezdxf
+    # Настраиваем RenderContext для чёрно-белого вывода
     ctx = RenderContext(doc)
+    
+    # Устанавливаем цветовую схему - все линии чёрные на белом фоне
+    ctx.current_layout.set_colors(
+        background='#FFFFFF',  # белый фон
+        foreground='#000000',  # чёрные линии
+    )
+    
     out = MatplotlibBackend(ax)
     frontend = Frontend(ctx, out)
     frontend.draw_layout(msp, finalize=True)
     
-    # Принудительно устанавливаем чёрный цвет для всех matplotlib элементов
+    # Принудительно все элементы делаем чёрными
     for line in ax.get_lines():
         line.set_color('black')
         line.set_linewidth(0.5)
@@ -508,33 +515,26 @@ def dxf_to_pdf(dxf_path: str, pdf_path: str):
         collection.set_edgecolor('black')
         collection.set_facecolor('none')
     
-    # Теперь рендерим DXF текст вручную (ezdxf backend иногда пропускает)
+    # Рендерим текст вручную (на случай если backend пропустил)
     for entity in msp:
         if entity.dxftype() == 'TEXT':
-            # Получаем свойства текста
             insert = entity.dxf.insert
             text_content = entity.dxf.text
             height = entity.dxf.height if hasattr(entity.dxf, 'height') else 2.5
             rotation = entity.dxf.rotation if hasattr(entity.dxf, 'rotation') else 0
-            
-            # Рисуем текст matplotlib'ом
             ax.text(insert[0], insert[1], text_content,
                    fontsize=height * 1.5, color='black',
                    rotation=rotation, ha='left', va='bottom')
-        
         elif entity.dxftype() == 'MTEXT':
-            # Многострочный текст
             insert = entity.dxf.insert
             text_content = entity.text
             height = entity.dxf.char_height if hasattr(entity.dxf, 'char_height') else 2.5
-            
             ax.text(insert[0], insert[1], text_content,
                    fontsize=height * 1.5, color='black',
                    ha='left', va='bottom')
     
     ax.set_axis_off()
     
-    # Сохраняем в PDF
     plt.tight_layout()
     plt.savefig(pdf_path, format='pdf', bbox_inches='tight',
                 facecolor='white', edgecolor='none', pad_inches=0.1)
