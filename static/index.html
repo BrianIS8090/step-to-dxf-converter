@@ -540,6 +540,7 @@
             
             // Показываем спиннер
             spinner.classList.add('show');
+            void spinner.offsetHeight; // Force reflow
             spinnerText.textContent = 'Конвертация STEP в DXF...';
             
             // Анимация текста деталей
@@ -557,13 +558,7 @@
             }, 2000);
             
             // Даём браузеру время отрендерить спиннер
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        setTimeout(resolve, 200);
-                    });
-                });
-            });
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             const formData = new FormData();
             formData.append('file', selectedFile);
@@ -612,6 +607,7 @@
             
             // Показываем спиннер
             spinner.classList.add('show');
+            void spinner.offsetHeight; // Force reflow
             spinnerText.textContent = 'Конвертация STEP в PDF...';
             
             // Анимация текста деталей
@@ -628,14 +624,8 @@
                 detailIndex++;
             }, 2000);
             
-            // Даём браузеру время отрендерить спиннер
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        setTimeout(resolve, 200);
-                    });
-                });
-            });
+            // Даём браузеру время отрендерить спиннер  
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             const formData = new FormData();
             formData.append('file', selectedFile);
